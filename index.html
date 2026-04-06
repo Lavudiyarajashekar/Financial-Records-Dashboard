@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Finance Tracker</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: #2c3e50;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 22px;
+    }
+
+    .container {
+      width: 90%;
+      margin: 20px auto;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    input, select, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: #3498db;
+      color: white;
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .btn-edit {
+      background: #f39c12; 
+      color: white;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+
+    th {
+      background: #34495e;
+      color: white;
+    }
+  </style>
+</head>
+
+
+
+<body>
+
+<header> Financial Records Dashboard</header>
+
+<div class="container">
+
+  <!-- FORM -->
+  <div class="card">
+    <h3>Add / Update Record</h3>
+
+    <input type="hidden" id="recordId">
+
+    <input type="number" id="amount" placeholder="Amount">
+    
+    <select id="type">
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+    </select>
+
+    <input type="text" id="category" placeholder="Category">
+
+    <input type="date" id="date">
+
+    <input type="text" id="notes" placeholder="Notes">
+
+    <button class="btn-primary" onclick="saveRecord()">Save</button>
+  </div>
+
+
+
+  <!-- FILTER -->
+  <div class="card">
+    <h3>Filter</h3>
+
+    <select id="filterType">
+      <option value="">All</option>
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+    </select>
+
+    <input type="text" id="filterCategory" placeholder="Category">
+
+    <button class="btn-primary" onclick="loadRecords()">Apply</button>
+  </div>
+
+
+
+  <!-- ANALYTICS -->
+  <div class="card">
+    <h3>Analytics</h3>
+
+    <div style="display:flex; gap:20px;">
+      <div class="card" style="flex:1; background:#2ecc71; color:white;">
+        <h4>Income</h4>
+        <h2 id="income">0</h2>
+      </div>
+
+      <div class="card" style="flex:1; background: #F25C73; color:white;">
+        <h4>Expense</h4>
+        <h2 id="expense">0</h2>
+      </div>
+
+      <div class="card" style="flex:1; background:#3498db; color:white;">
+        <h4>Balance</h4>
+        <h2 id="balance">0</h2>
+      </div>
+    </div>
+
+    <!-- CHART -->
+
+
+    <div style="width: 400px; margin: auto;">
+      <canvas id="myChart"></canvas>
+    </div>
+  </div>
+
+
+
+  <!-- TABLE -->
+  <div class="card">
+    <h3>Records</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Amount</th>
+          <th>Type</th>
+          <th>Category</th>
+          <th>Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody id="recordTable"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const API = "http://localhost:5000/api/records";
+
+let chart;
+
+// DRAW CHART
+function drawChart(data) {
+  const ctx = document.getElementById("myChart");
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: ["Income", "Expense"],
+      backgroundColor: ["#2ecc71", "#e74c3c"],
+      datasets: [{
+        data: [data.totalIncome, data.totalExpense],
+        options: {
+        cutout: "70%"   
+      }
+        
+      }]
+    }
+  });
+}
+
+// LOAD ANALYTICS
+async function loadAnalytics() {
+  const res = await fetch(API + "/analytics");
+  const data = await res.json();
+
+  document.getElementById("income").innerText = data.totalIncome;
+  document.getElementById("expense").innerText = data.totalExpense;
+  document.getElementById("balance").innerText = data.balance;
+
+  drawChart(data);
+}
+
+// SAVE RECORD
+async function saveRecord() {
+  const id = document.getElementById("recordId").value;
+
+  const data = {
+    amount: document.getElementById("amount").value,
+    type: document.getElementById("type").value,
+    category: document.getElementById("category").value,
+    date: document.getElementById("date").value,
+    notes: document.getElementById("notes").value
+  };
+
+  if (id) {
+    await fetch(`${API}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  } else {
+    await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+  }
+
+  clearForm();
+  loadRecords();
+}
+
+// LOAD RECORDS
+async function loadRecords() {
+  let url = API;
+
+  const type = document.getElementById("filterType").value;
+  const category = document.getElementById("filterCategory").value;
+
+  if (type || category) {
+    url += "?";
+    if (type) url += `type=${type}&`;
+    if (category) url += `category=${category}`;
+  }
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const table = document.getElementById("recordTable");
+  table.innerHTML = "";
+
+  data.forEach(r => {
+    table.innerHTML += `
+      <tr>
+        <td>${r.amount}</td>
+        <td>${r.type}</td>
+        <td>${r.category}</td>
+        <td>${r.date.substring(0,10)}</td>
+        <td>
+          <button class="btn-edit" onclick="editRecord('${r._id}', '${r.amount}', '${r.type}', '${r.category}', '${r.date}', '${r.notes}')">Edit</button>
+          <button class="btn-danger" onclick="deleteRecord('${r._id}')">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  // UPDATE ANALYTICS
+  loadAnalytics();
+}
+
+// EDIT
+function editRecord(id, amount, type, category, date, notes) {
+  document.getElementById("recordId").value = id;
+  document.getElementById("amount").value = amount;
+  document.getElementById("type").value = type;
+  document.getElementById("category").value = category;
+  document.getElementById("date").value = date.substring(0,10);
+  document.getElementById("notes").value = notes;
+}
+
+//  DELETE
+async function deleteRecord(id) {
+  await fetch(`${API}/${id}`, { method: "DELETE" });
+  loadRecords();
+}
+
+// CLEAR FORM
+function clearForm() {
+  document.getElementById("recordId").value = "";
+  document.getElementById("amount").value = "";
+  document.getElementById("category").value = "";
+  document.getElementById("date").value = "";
+  document.getElementById("notes").value = "";
+}
+
+// INITIAL LOAD
+loadRecords();
+</script>
+
+</body>
+</html>
