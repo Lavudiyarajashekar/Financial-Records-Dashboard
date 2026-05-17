@@ -10,7 +10,6 @@ A full-stack Financial Records Dashboard that allows users to manage income and 
 - View analytics (total income, expense, balance)
 - Interactive chart visualization (Chart.js)
 - Clean and responsive UI
----
 
 ## Tech Stack
 
